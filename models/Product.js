@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import Brand from "./Brand.js";
 
 const productSchema = new mongoose.Schema(
 	{
@@ -28,7 +29,8 @@ const productSchema = new mongoose.Schema(
 			required: [true, "Product category is required"],
 		},
 		brand: {
-			type: String,
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Brand",
 			trim: true,
 		},
 		sku: {
@@ -104,6 +106,13 @@ const productSchema = new mongoose.Schema(
 			type: String,
 			required: false,
 		},
+		deals: [
+			{
+				type: mongoose.Schema.Types.ObjectId,
+				ref: "Deal",
+			},
+		],
+		originalPrice: Number,
 	},
 	{
 		timestamps: true,
@@ -122,10 +131,28 @@ productSchema.pre("save", function (next) {
 	next();
 });
 
-// Index for search
-// productSchema.index({ name: "text", description: "text", tags: "text" });
-// productSchema.index({ category: 1, isActive: 1 });
-// productSchema.index({ price: 1 });
-// productSchema.index({ createdAt: -1 });
+// In Product model
+productSchema.post("save", async function (doc) {
+	const brandId = doc.brand;
+	if (brandId) {
+		const categories = await Product.distinct("category", { brand: brandId });
+		await Brand.findByIdAndUpdate(brandId, { categories });
+	}
+});
 
-export default mongoose.model("Product", productSchema);
+productSchema.post("remove", async function (doc) {
+	const brandId = doc.brand;
+	if (brandId) {
+		const categories = await Product.distinct("category", { brand: brandId });
+		await Brand.findByIdAndUpdate(brandId, { categories });
+	}
+});
+
+// Index for search
+productSchema.index({ name: "text", description: "text", tags: "text" });
+productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ price: 1 });
+productSchema.index({ createdAt: -1 });
+
+const Product = mongoose.model("Product", productSchema);
+export default Product;

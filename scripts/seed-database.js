@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import Brand from "../models/Brand.js";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
@@ -45,72 +46,56 @@ const createAdminUser = async () => {
 	}
 };
 
+// Seed brands
+const seedBrands = async () => {
+	try {
+		const brands = [
+			{
+				name: "Apple",
+				description: "Technology company specializing in consumer electronics",
+				logo: "apple-logo.jpg",
+				website: "https://www.apple.com",
+				featured: true,
+			},
+			{
+				name: "Samsung",
+				description: "South Korean multinational electronics corporation",
+				logo: "samsung-logo.jpg",
+				website: "https://www.samsung.com",
+				featured: true,
+			},
+			{
+				name: "FashionCo",
+				description: "Premium clothing brand",
+				logo: "fashionco-logo.jpg",
+				website: "https://www.fashionco.com",
+			},
+			{
+				name: "KitchenMaster",
+				description: "Innovative kitchen appliances",
+				logo: "kitchenmaster-logo.jpg",
+				website: "https://www.kitchenmaster.com",
+			},
+		];
+
+		// Save brands one by one to ensure proper slug generation
+		const createdBrands = [];
+		for (const brandData of brands) {
+			const brand = new Brand(brandData);
+			await brand.save();
+			createdBrands.push(brand);
+			console.log(`Created brand: ${brand.name}`);
+		}
+
+		console.log("Brands seeded successfully");
+		return createdBrands;
+	} catch (error) {
+		console.error("Error seeding brands:", error.message);
+		throw error;
+	}
+};
+
 // Seed categories
-// const seedCategories = async () => {
-// 	try {
-// 		const categories = [
-// 			{
-// 				name: "Electronics",
-// 				description: "All electronic devices and accessories",
-// 				image: "electronics.jpg",
-// 			},
-// 			{
-// 				name: "Clothing",
-// 				description: "Men, women and kids clothing",
-// 				image: "clothing.jpg",
-// 			},
-// 			{
-// 				name: "Home & Kitchen",
-// 				description: "Home appliances and kitchenware",
-// 				image: "home-kitchen.jpg",
-// 			},
-// 			{
-// 				name: "Smartphones",
-// 				description: "Latest smartphones and accessories",
-// 				parent: null, // Will be set after parent is created
-// 				image: "smartphones.jpg",
-// 			},
-// 			{
-// 				name: "Laptops",
-// 				description: "Laptops and notebooks",
-// 				parent: null, // Will be set after parent is created
-// 				image: "laptops.jpg",
-// 			},
-// 		];
-
-// 		// First create parent categories
-// 		const parentCategories = await Category.insertMany(categories.slice(0, 3));
-// 		console.log("Parent categories seeded");
-
-// 		// Now create child categories with proper parent references
-// 		const electronicsCategory = parentCategories.find(
-// 			(c) => c.name === "Electronics"
-// 		);
-
-// 		const childCategories = [
-// 			{
-// 				name: "Smartphones",
-// 				description: "Latest smartphones and accessories",
-// 				parent: electronicsCategory._id,
-// 				image: "smartphones.jpg",
-// 			},
-// 			{
-// 				name: "Laptops",
-// 				description: "Laptops and notebooks",
-// 				parent: electronicsCategory._id,
-// 				image: "laptops.jpg",
-// 			},
-// 		];
-
-// 		const createdChildCategories = await Category.insertMany(childCategories);
-// 		console.log("Child categories seeded");
-
-// 		return [...parentCategories, ...createdChildCategories];
-// 	} catch (error) {
-// 		console.error("Error seeding categories:", error.message);
-// 		throw error;
-// 	}
-// };
 const seedCategories = async () => {
 	try {
 		// First create parent categories one by one to ensure slugs are generated
@@ -172,18 +157,21 @@ const seedCategories = async () => {
 	}
 };
 
-// Seed products
-const seedProducts = async (categories) => {
+// Seed products with brand references
+const seedProducts = async (categories, brands) => {
 	try {
-		const electronicsCategory = categories.find(
-			(c) => c.name === "Electronics"
-		);
+		// Find all needed references
 		const smartphonesCategory = categories.find(
 			(c) => c.name === "Smartphones"
 		);
 		const laptopsCategory = categories.find((c) => c.name === "Laptops");
 		const clothingCategory = categories.find((c) => c.name === "Clothing");
 		const homeCategory = categories.find((c) => c.name === "Home & Kitchen");
+
+		const appleBrand = brands.find((b) => b.name === "Apple");
+		const samsungBrand = brands.find((b) => b.name === "Samsung");
+		const fashionCoBrand = brands.find((b) => b.name === "FashionCo");
+		const kitchenMasterBrand = brands.find((b) => b.name === "KitchenMaster");
 
 		const products = [
 			{
@@ -192,7 +180,7 @@ const seedProducts = async (categories) => {
 				price: 999,
 				comparePrice: 1099,
 				category: smartphonesCategory._id,
-				brand: "Apple",
+				brand: appleBrand._id,
 				sku: "IPH15PRO256",
 				images: [
 					{
@@ -225,7 +213,7 @@ const seedProducts = async (categories) => {
 				price: 2499,
 				comparePrice: 2699,
 				category: laptopsCategory._id,
-				brand: "Apple",
+				brand: appleBrand._id,
 				sku: "MBP16M1MAX",
 				images: [
 					{
@@ -259,7 +247,7 @@ const seedProducts = async (categories) => {
 				price: 799,
 				comparePrice: 899,
 				category: smartphonesCategory._id,
-				brand: "Samsung",
+				brand: samsungBrand._id,
 				sku: "SGS23BLK256",
 				images: [
 					{
@@ -291,7 +279,7 @@ const seedProducts = async (categories) => {
 				price: 29.99,
 				comparePrice: 39.99,
 				category: clothingCategory._id,
-				brand: "FashionCo",
+				brand: fashionCoBrand._id,
 				sku: "CTSHIRTWHM",
 				images: [
 					{
@@ -318,7 +306,7 @@ const seedProducts = async (categories) => {
 				price: 129.99,
 				comparePrice: 149.99,
 				category: homeCategory._id,
-				brand: "KitchenMaster",
+				brand: kitchenMasterBrand._id,
 				sku: "KMAF5LDIG",
 				images: [
 					{
@@ -346,11 +334,14 @@ const seedProducts = async (categories) => {
 				isFeatured: true,
 			},
 		];
+
+		console.log(typeof products);
 		for (const productData of products) {
 			const product = new Product(productData);
 			await product.save();
 			console.log(`Created product: ${product.name}`);
 		}
+
 		console.log("Products seeded successfully");
 	} catch (error) {
 		console.error("Error seeding products:", error.message);
@@ -365,12 +356,14 @@ const seedDatabase = async () => {
 
 		// Clear existing data (optional - be careful in production)
 		await User.deleteMany({});
+		await Brand.deleteMany({});
 		await Category.deleteMany({});
 		await Product.deleteMany({});
 
 		const admin = await createAdminUser();
+		const brands = await seedBrands();
 		const categories = await seedCategories();
-		await seedProducts(categories);
+		await seedProducts(categories, brands);
 
 		console.log("Database seeding completed successfully");
 		process.exit(0);
@@ -382,3 +375,7 @@ const seedDatabase = async () => {
 
 // Execute the seeding
 seedDatabase();
+
+// Run this after seedDatabase
+const sample = await Product.find().limit(1).populate("category brand").lean();
+console.log(JSON.stringify(sample, null, 2));

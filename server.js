@@ -16,6 +16,8 @@ import userRoutes from "./routes/users.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
+import BrandRouter from "./routes/brand.js";
+import router from "./routes/deal.js";
 
 connectDB();
 
@@ -56,6 +58,8 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/brands", BrandRouter);
+app.use("/api/deals", router);
 
 // Health check
 app.get("/api/health", (req, res) => {
