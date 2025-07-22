@@ -1,58 +1,76 @@
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { generateToken } from "../services/token.js";
 
-const generateToken = (id) => {
-	return jwt.sign({ id }, process.env.JWT_SECRET, {
-		expiresIn: process.env.JWT_EXPIRE || "30d",
-	});
-};
-
-export const sendOtp = async (req, res, next) => {
+export const sendOtpToPhone = async (req, res, next) => {
 	try {
-		const { name, email, phone, password } = req.body;
+		const { phone } = req.body;
+		console.log(phone);
 
-		const existingUser = await User.findOne({ email });
-		if (existingUser) {
+		if (!phone) {
 			return res.status(400).json({
 				success: false,
-				message: "User already exists with this email",
+				message: "Phone number is required",
 			});
 		}
 
-		// Generate 6-digit OTP
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
 		const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-		// Temporarily store user data with OTP (not saving password yet)
-		const user = await User.create({
-			name,
-			email,
-			phone,
-			password,
-			otpCode: otp,
-			otpExpires,
-			isVerified: false,
-		});
+		let user = await User.findOne({ phone });
 
-		// Simulate sending OTP (log to console or integrate with email/SMS API)
-		console.log(`OTP for ${email}: ${otp}`);
+		if (user) {
+			// Existing user: update OTP
+			user.otpCode = otp;
+			user.otpExpires = otpExpires;
+			await user.save();
+		} else {
+			// New user: create temporary user with just phone & OTP
+			user = await User.create({
+				phone,
+				otpCode: otp,
+				otpExpires,
+				isVerified: false,
+			});
+		}
+
+		console.log(`OTP for ${phone}: ${otp}`);
 
 		res.status(200).json({
 			success: true,
 			message: "OTP sent successfully",
-			email,
+			results: { phone, isRegistered: !!user.name, otp }, // help frontend decide next step
 		});
 	} catch (error) {
 		next(error);
 	}
 };
 
-export const verifyOtp = async (req, res, next) => {
+export const verifyOtpPhone = async (req, res, next) => {
 	try {
-		const { email, otp } = req.body;
+		const { phone, otp } = req.body;
 
-		const user = await User.findOne({ email });
+		if (!phone || !otp) {
+			return res.status(400).json({
+				success: false,
+				message: "Phone number and OTP are required",
+			});
+		}
+		if (!/^\+?[\d\s-()]+$/.test(phone)) {
+			return res.status(400).json({
+				success: false,
+				message: "Invalid phone number format",
+			});
+		}
+		if (!/^\d{6}$/.test(otp)) {
+			return res.status(400).json({
+				success: false,
+				message: "OTP must be a 6-digit number",
+			});
+		}
+		// Find user by phone
+
+		const user = await User.findOne({ phone });
 
 		if (!user || !user.otpCode || user.otpExpires < Date.now()) {
 			return res.status(400).json({
@@ -68,51 +86,129 @@ export const verifyOtp = async (req, res, next) => {
 			});
 		}
 
-		user.isVerified = true;
+		// OTP matched
 		user.otpCode = undefined;
 		user.otpExpires = undefined;
-		await user.save();
-
-		const token = generateToken(user._id);
-
-		res.status(200).json({
-			success: true,
-			message: "OTP verified, registration successful",
-			token,
-			user,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
-
-export const login = async (req, res, next) => {
-	try {
-		const { email, password } = req.body;
-
-		const user = await User.findOne({ email }).select("+password");
-		if (!user || !(await user.comparePassword(password))) {
-			return res.status(401).json({
-				success: false,
-				message: "Invalid credentials",
-			});
-		}
-
+		user.isVerified = true;
 		user.lastLogin = new Date();
 		await user.save();
 
 		const token = generateToken(user._id);
 
+		if (user.name && user.email) {
+			// Already registered → Login
+			return res.status(200).json({
+				success: true,
+				message: "Login successful",
+				results: {
+					token,
+					user,
+					isRegistered: true,
+				}, // User is fully registered
+			});
+		} else {
+			// Needs full registration
+			return res.status(200).json({
+				success: true,
+				message: "OTP verified. Proceed to complete registration.",
+				results: {
+					token,
+					user: {
+						_id: user._id,
+						phone: user.phone,
+						isVerified: user.isVerified,
+					},
+					isRegistered: false, // User needs to complete registration
+				},
+			});
+		}
+	} catch (error) {
+		next(error);
+	}
+};
+
+export const completeRegistration = async (req, res, next) => {
+	console.log(req.user.id);
+	try {
+		const {
+			name,
+			email,
+			password,
+			userName,
+			city,
+			state,
+			street,
+			zipCode,
+			country = "India",
+		} = req.body;
+
+		const user = await User.findById(req.user.id); // use token from OTP verification
+
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
+
+		if (user.name && user.email) {
+			return res.status(400).json({
+				success: false,
+				message: "User is already registered",
+			});
+		}
+
+		user.name = name;
+		user.email = email;
+		user.password = password;
+		user.userName = userName;
+		user.address = {
+			street,
+			city,
+			state,
+			zipCode,
+			country,
+		};
+
+		await user.save();
+
 		res.status(200).json({
 			success: true,
-			message: "Login successful",
-			token,
+			message: "Registration completed successfully",
 			user,
 		});
 	} catch (error) {
 		next(error);
 	}
 };
+
+// export const login = async (req, res, next) => {
+// 	try {
+// 		const { email, password } = req.body;
+
+// 		const user = await User.findOne({ email }).select("+password");
+// 		if (!user || !(await user.comparePassword(password))) {
+// 			return res.status(401).json({
+// 				success: false,
+// 				message: "Invalid credentials",
+// 			});
+// 		}
+
+// 		user.lastLogin = new Date();
+// 		await user.save();
+
+// 		const token = generateToken(user._id);
+
+// 		res.status(200).json({
+// 			success: true,
+// 			message: "Login successful",
+// 			token,
+// 			user,
+// 		});
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
 export const getMe = async (req, res, next) => {
 	try {

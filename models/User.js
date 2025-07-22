@@ -5,13 +5,11 @@ const userSchema = new mongoose.Schema(
 	{
 		name: {
 			type: String,
-			required: [true, "Name is required"],
 			trim: true,
 			maxlength: [50, "Name cannot exceed 50 characters"],
 		},
 		email: {
 			type: String,
-			required: [true, "Email is required"],
 			unique: true,
 			lowercase: true,
 			match: [
@@ -19,9 +17,22 @@ const userSchema = new mongoose.Schema(
 				"Please enter a valid email",
 			],
 		},
+		userName: {
+			type: String,
+			unique: true,
+			trim: true,
+			maxlength: [30, "Username cannot exceed 30 characters"],
+			lowercase: true,
+			match: [
+				/^[a-z0-9_]+$/,
+				"Username can only contain lowercasealphanumeric characters and underscores",
+			],
+			default: "user" + Date.now(), // Default username if not provided
+		},
+
 		password: {
 			type: String,
-			required: [true, "Password is required"],
+
 			minlength: [6, "Password must be at least 6 characters"],
 			select: false,
 		},

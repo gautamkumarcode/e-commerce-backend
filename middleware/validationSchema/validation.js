@@ -20,16 +20,41 @@ export const validateRequest = (schema) => {
 };
 
 // Validation schemas
-export const registerSchema = Joi.object({
+export const sendOtpSchema = Joi.object({
+	phone: Joi.string()
+		.pattern(/^\+?[\d\s-()]+$/)
+		.required(),
+});
+
+export const completeRegistrationSchema = Joi.object({
 	name: Joi.string().min(2).max(50).required(),
 	email: Joi.string().email().required(),
 	password: Joi.string().min(6).required(),
+	userName: Joi.string()
+		.min(3)
+		.max(30)
+		.pattern(/^[a-z0-9_]+$/)
+		.required(),
+
+	city: Joi.string().optional(),
+	state: Joi.string().optional(),
+	street: Joi.string().optional(),
+	zipCode: Joi.string().optional(),
+	country: Joi.string().optional(),
+});
+
+// export const registerSchema = Joi.object({
+// 	name: Joi.string().min(2).max(50).required(),
+// 	email: Joi.string().email().required(),
+// 	password: Joi.string().min(6).required(),
+// 	phone: Joi.string()
+// 		.pattern(/^\+?[\d\s-()]+$/)
+// 		.optional(),
+// });
+export const verifyOtpSchema = Joi.object({
 	phone: Joi.string()
 		.pattern(/^\+?[\d\s-()]+$/)
-		.optional(),
-});
-export const verifyOtpSchema = Joi.object({
-	email: Joi.string().email().required(),
+		.required(),
 	otp: Joi.number().required(),
 });
 export const loginSchema = Joi.object({
