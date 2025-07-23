@@ -2,10 +2,18 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import { generateToken } from "../services/token.js";
 
+
+
+// In-memory cooldown store to prevent OTP resend spam
+const otpCooldownStore = new Map();
+
+// Helper: Normalize phone to last 10 digits
+const normalizePhone = (phone) => phone.replace(/^(\+91|0)+/, "").slice(-10);
+
+// 🟢 Send OTP (Debounced for 60 seconds)
 export const sendOtpToPhone = async (req, res, next) => {
 	try {
-		const { phone } = req.body;
-		console.log(phone);
+		let { phone } = req.body;
 
 		if (!phone) {
 			return res.status(400).json({
@@ -14,18 +22,30 @@ export const sendOtpToPhone = async (req, res, next) => {
 			});
 		}
 
+		phone = normalizePhone(phone);
+
+		// Check debounce cooldown
+		const now = Date.now();
+		const lastSent = otpCooldownStore.get(phone);
+
+		if (lastSent && now - lastSent < 6 * 1000) {
+			return res.status(429).json({
+				success: false,
+
+				message: "OTP already sent. Please wait 60 seconds before trying again.",
+			});
+		}
+
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
-		const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+		const otpExpires = new Date(now + 10 * 60 * 1000); // 10 minutes
 
 		let user = await User.findOne({ phone });
 
 		if (user) {
-			// Existing user: update OTP
 			user.otpCode = otp;
 			user.otpExpires = otpExpires;
 			await user.save();
 		} else {
-			// New user: create temporary user with just phone & OTP
 			user = await User.create({
 				phone,
 				otpCode: otp,
@@ -34,21 +54,30 @@ export const sendOtpToPhone = async (req, res, next) => {
 			});
 		}
 
-		console.log(`OTP for ${phone}: ${otp}`);
+		// Save cooldown
+		otpCooldownStore.set(phone, now);
 
-		res.status(200).json({
+		// Send OTP - use console or integrate with Twilio, etc.
+		console.log(`📨 OTP for ${phone}: ${otp}`);
+
+		return res.status(200).json({
 			success: true,
 			message: "OTP sent successfully",
-			results: { phone, isRegistered: !!user.name, otp }, // help frontend decide next step
+			results: {
+				phone,
+				otp: otp, // In production, do not return OTP in response
+				isRegistered: !!user.name,
+			},
 		});
 	} catch (error) {
 		next(error);
 	}
 };
 
+// ✅ Verify OTP and login/register
 export const verifyOtpPhone = async (req, res, next) => {
 	try {
-		const { phone, otp } = req.body;
+		let { phone, otp } = req.body;
 
 		if (!phone || !otp) {
 			return res.status(400).json({
@@ -56,76 +85,66 @@ export const verifyOtpPhone = async (req, res, next) => {
 				message: "Phone number and OTP are required",
 			});
 		}
-		if (!/^\+?[\d\s-()]+$/.test(phone)) {
-			return res.status(400).json({
-				success: false,
-				message: "Invalid phone number format",
-			});
-		}
-		if (!/^\d{6}$/.test(otp)) {
-			return res.status(400).json({
-				success: false,
-				message: "OTP must be a 6-digit number",
-			});
-		}
-		// Find user by phone
+
+		phone = normalizePhone(phone);
 
 		const user = await User.findOne({ phone });
 
-		if (!user || !user.otpCode || user.otpExpires < Date.now()) {
+		if (!user) {
 			return res.status(400).json({
 				success: false,
-				message: "OTP is invalid or expired",
+				message: "User not found",
 			});
 		}
 
-		if (user.otpCode !== otp) {
+		if (!user.otpCode || user.otpCode !== otp) {
 			return res.status(400).json({
 				success: false,
 				message: "Invalid OTP",
 			});
 		}
 
-		// OTP matched
+		if (user.otpExpires < new Date()) {
+			return res.status(400).json({
+				success: false,
+				message: "OTP expired",
+			});
+		}
+
+		// Clear OTP fields
 		user.otpCode = undefined;
 		user.otpExpires = undefined;
 		user.isVerified = true;
-		user.lastLogin = new Date();
 		await user.save();
 
 		const token = generateToken(user._id);
 
-		if (user.name && user.email) {
-			// Already registered → Login
-			return res.status(200).json({
-				success: true,
-				message: "Login successful",
-				results: {
-					token,
-					user,
-					isRegistered: true,
-				}, // User is fully registered
-			});
-		} else {
-			// Needs full registration
-			return res.status(200).json({
-				success: true,
-				message: "OTP verified. Proceed to complete registration.",
-				results: {
-					token,
-					user: {
-						_id: user._id,
-						phone: user.phone,
-						isVerified: user.isVerified,
-					},
-					isRegistered: false, // User needs to complete registration
-				},
-			});
-		}
+		const userObj = user.toObject();
+		delete userObj.password;
+
+		return res.status(200).json({
+			success: true,
+			message: "Login successful",
+			results: {
+				user: userObj,
+				token,
+			},
+		});
 	} catch (error) {
 		next(error);
 	}
 };
+
+// Optional: Cleanup stale cooldown entries
+setInterval(() => {
+	const now = Date.now();
+	for (const [phone, timestamp] of otpCooldownStore.entries()) {
+		if (now - timestamp > 5 * 60 * 1000) {
+			otpCooldownStore.delete(phone);
+		}
+	}
+}, 60 * 1000); // Run every 60 seconds
+
 
 export const completeRegistration = async (req, res, next) => {
 	console.log(req.user.id);
