@@ -55,7 +55,7 @@ export const getBrandWithCategories = async (req, res, next) => {
 		// 3. Return combined response
 		res.status(200).json({
 			success: true,
-			data: {
+			results: {
 				brand: {
 					_id: brand._id,
 					name: brand.name,
@@ -71,20 +71,53 @@ export const getBrandWithCategories = async (req, res, next) => {
 	}
 };
 
-// @desc   get all the brands
+// @desc   get all the brands and search by name
+// @route  GET /api/brands/search
 export const getAllBrands = async (req, res, next) => {
 	try {
-		const brands = await Brand.find({ isActive: true }).sort({ name: 1 });
+		const { search } = req.query;
+
+		const page = Number.parseInt(req.query.page) || 1;
+		const limit = Number.parseInt(req.query.limit) || 10;
+		const skip = (page - 1) * limit;
+
+		// Build the filter
+		const filter = { isActive: true };
+		if (search) {
+			filter.name = { $regex: search, $options: "i" };
+		}
+
+		// Paginated & filtered query
+		const paginatedBrands = await Brand.find(filter)
+			.select("-createdAt -updatedAt")
+			.sort({ name: 1 })
+			.skip(skip)
+			.limit(limit);
+
+		const total = await Brand.countDocuments(filter);
+		const totalPages = Math.ceil(total / limit);
+
+		if (!paginatedBrands || paginatedBrands.length === 0) {
+			return res.status(404).json({
+				success: false,
+				message: "No active brands found",
+			});
+		}
 
 		res.status(200).json({
 			success: true,
-			count: brands.length,
-			data: brands,
+			data: {
+				count: paginatedBrands.length,
+				totalPages,
+				currentPage: page,
+				results: paginatedBrands,
+			},
 		});
 	} catch (error) {
 		next(error);
 	}
 };
+
 
 // @desc    create a new brand
 export const createBrand = async (req, res, next) => {
