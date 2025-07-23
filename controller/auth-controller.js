@@ -24,40 +24,67 @@ export const sendOtpToPhone = async (req, res, next) => {
 
 		phone = normalizePhone(phone);
 
-		// Check debounce cooldown
+		// Check cooldown
 		const now = Date.now();
 		const lastSent = otpCooldownStore.get(phone);
-
-		if (lastSent && now - lastSent < 6 * 1000) {
+		if (lastSent && now - lastSent < 60 * 1000) {
 			return res.status(429).json({
 				success: false,
-
-				message: "OTP already sent. Please wait 60 seconds before trying again.",
+				message:
+					"OTP already sent. Please wait 60 seconds before trying again.",
 			});
 		}
 
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
-		const otpExpires = new Date(now + 10 * 60 * 1000); // 10 minutes
+		const otpExpires = new Date(now + 10 * 60 * 1000);
 
-		let user = await User.findOne({ phone });
+		// Try find + update user in one go
+		let user = await User.findOneAndUpdate(
+			{ phone },
+			{
+				$set: {
+					otpCode: otp,
+					otpExpires,
+					isVerified: false,
+				},
+			},
+			{ new: true }
+		);
 
-		if (user) {
-			user.otpCode = otp;
-			user.otpExpires = otpExpires;
-			await user.save();
-		} else {
-			user = await User.create({
-				phone,
-				otpCode: otp,
-				otpExpires,
-				isVerified: false,
-			});
+		// If user doesn't exist, create one
+		if (!user) {
+			try {
+				user = new User({
+					phone,
+					otpCode: otp,
+					otpExpires,
+					isVerified: false,
+				});
+
+				await user.save({ validateBeforeSave: false });
+			} catch (error) {
+				// Handle duplicate error race condition
+				if (error.code === 11000) {
+					user = await User.findOneAndUpdate(
+						{ phone },
+						{
+							$set: {
+								otpCode: otp,
+								otpExpires,
+								isVerified: false,
+							},
+						},
+						{ new: true }
+					);
+				} else {
+					throw error;
+				}
+			}
 		}
 
 		// Save cooldown
 		otpCooldownStore.set(phone, now);
 
-		// Send OTP - use console or integrate with Twilio, etc.
 		console.log(`📨 OTP for ${phone}: ${otp}`);
 
 		return res.status(200).json({
@@ -65,7 +92,7 @@ export const sendOtpToPhone = async (req, res, next) => {
 			message: "OTP sent successfully",
 			results: {
 				phone,
-				otp: otp, // In production, do not return OTP in response
+				otp, // ⚠️ remove in production
 				isRegistered: !!user.name,
 			},
 		});
@@ -145,9 +172,7 @@ setInterval(() => {
 	}
 }, 60 * 1000); // Run every 60 seconds
 
-
 export const completeRegistration = async (req, res, next) => {
-	console.log(req.user.id);
 	try {
 		const {
 			name,

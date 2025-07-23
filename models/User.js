@@ -1,6 +1,17 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 
+const addressSchema = new mongoose.Schema(
+	{
+		street: { type: String },
+		city: { type: String },
+		state: { type: String },
+		zipCode: { type: String },
+		country: { type: String },
+	},
+	{ _id: false }
+);
+
 const userSchema = new mongoose.Schema(
 	{
 		name: {
@@ -10,6 +21,7 @@ const userSchema = new mongoose.Schema(
 		},
 		email: {
 			type: String,
+			required: [true, "Email is required"],
 			unique: true,
 			lowercase: true,
 			match: [
@@ -25,14 +37,15 @@ const userSchema = new mongoose.Schema(
 			lowercase: true,
 			match: [
 				/^[a-z0-9_]+$/,
-				"Username can only contain lowercasealphanumeric characters and underscores",
+				"Username can only contain lowercase alphanumeric characters and underscores",
 			],
-			default: "user" + Date.now(), // Default username if not provided
+			default: function () {
+				return "user" + Date.now();
+			},
 		},
-
 		password: {
 			type: String,
-
+			required: [true, "Password is required"],
 			minlength: [6, "Password must be at least 6 characters"],
 			select: false,
 		},
@@ -43,26 +56,15 @@ const userSchema = new mongoose.Schema(
 		},
 		avatar: {
 			type: String,
-			default: "",
 		},
 		phone: {
 			type: String,
 			match: [/^\+?[\d\s-()]+$/, "Please enter a valid phone number"],
 		},
 		address: {
-			type: new mongoose.Schema(
-				{
-					street: { type: String, default: "" },
-					city: { type: String, default: "" },
-					state: { type: String, default: "" },
-					zipCode: { type: String, default: "" },
-					country: { type: String, default: "" },
-				},
-				{ _id: false } // Prevents creating a separate _id for the address subdocument
-			),
+			type: addressSchema,
 			default: {},
 		},
-
 		isEmailVerified: {
 			type: Boolean,
 			default: false,
@@ -75,11 +77,13 @@ const userSchema = new mongoose.Schema(
 			type: Boolean,
 			default: true,
 		},
-		otpCode: { type: String },
-		otpExpires: { type: Date },
-		isVerified: { type: Boolean, default: false },
+		otpCode: String,
+		otpExpires: Date,
+		isVerified: {
+			type: Boolean,
+			default: false,
+		},
 	},
-
 	{
 		timestamps: true,
 	}
@@ -100,17 +104,20 @@ userSchema.pre("save", async function (next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
+	if (!this.password) return false;
 	return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove password from JSON output
+// Hide sensitive fields from output
 userSchema.methods.toJSON = function () {
-	const userObject = this.toObject();
-	delete userObject.password;
-	delete userObject.emailVerificationToken;
-	delete userObject.passwordResetToken;
-	delete userObject.passwordResetExpires;
-	return userObject;
+	const obj = this.toObject();
+	delete obj.password;
+	delete obj.emailVerificationToken;
+	delete obj.passwordResetToken;
+	delete obj.passwordResetExpires;
+	delete obj.otpCode;
+	delete obj.otpExpires;
+	return obj;
 };
 
-export default mongoose.model("User", userSchema);
+export default mongoose.models.User || mongoose.model("User", userSchema);
