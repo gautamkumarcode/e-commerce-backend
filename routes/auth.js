@@ -4,6 +4,7 @@ import {
 	forgotPassword,
 	getMe,
 	logout,
+	resendOtpToPhone,
 	sendOtpToPhone,
 	verifyOtpPhone,
 } from "../controller/auth-controller.js";
@@ -21,6 +22,11 @@ const router = express.Router();
 
 router.post("/send-otp", validateRequest(sendOtpSchema), sendOtpToPhone);
 router.post("/verify-otp", validateRequest(verifyOtpSchema), verifyOtpPhone);
+
+// @route POST /api/auth/resend-otp
+router.post("/resend-otp", validateRequest(sendOtpSchema), resendOtpToPhone);
+
+// @route   POST /api/auth/register-details
 router.post(
 	"/register-details",
 	validateRequest(completeRegistrationSchema),

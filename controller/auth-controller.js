@@ -7,10 +7,9 @@ import { generateToken } from "../services/token.js";
 // In-memory cooldown store to prevent OTP resend spam
 const otpCooldownStore = new Map();
 
-// Helper: Normalize phone to last 10 digits
+
 const normalizePhone = (phone) => phone.replace(/^(\+91|0)+/, "").slice(-10);
 
-// 🟢 Send OTP (Debounced for 60 seconds)
 export const sendOtpToPhone = async (req, res, next) => {
 	try {
 		let { phone } = req.body;
@@ -94,6 +93,67 @@ export const sendOtpToPhone = async (req, res, next) => {
 				phone,
 				otp, // ⚠️ remove in production
 				isRegistered: !!user.name,
+			},
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+// 🟢 Resend OTP (Debounced for 60 seconds)
+export const resendOtpToPhone = async (req, res, next) => {
+	try {
+		let { phone } = req.body;
+
+		if (!phone) {
+			return res.status(400).json({
+				success: false,
+				message: "Phone number is required",
+			});
+		}
+
+		phone = normalizePhone(phone);
+
+		const now = Date.now();
+		const lastSent = otpCooldownStore.get(phone);
+
+		if (lastSent && now - lastSent < 60 * 1000) {
+			return res.status(429).json({
+				success: false,
+				message: "OTP already sent. Please wait 60 seconds before resending.",
+			});
+		}
+
+		const user = await User.findOne({ phone });
+
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message:
+					"User with this phone number does not exist. Please register first.",
+			});
+		}
+
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		const otpExpires = new Date(now + 10 * 60 * 1000);
+
+		user.otpCode = otp;
+		user.otpExpires = otpExpires;
+		user.isVerified = false;
+
+		await user.save({ validateBeforeSave: false });
+
+		// Save cooldown
+		otpCooldownStore.set(phone, now);
+
+		console.log(`🔁 OTP resent for ${phone}: ${otp}`);
+
+		return res.status(200).json({
+			success: true,
+			message: "OTP resent successfully",
+			results: {
+				phone,
+				otp, // ⚠️ Only show in development
 			},
 		});
 	} catch (error) {
