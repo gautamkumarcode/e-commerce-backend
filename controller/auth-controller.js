@@ -142,8 +142,9 @@ export const verifyOtpPhone = async (req, res, next) => {
 		user.otpCode = undefined;
 		user.otpExpires = undefined;
 		user.isVerified = true;
-		await user.save();
 
+
+				await user.save({ validateBeforeSave: false });
 		const token = generateToken(user._id);
 
 		const userObj = user.toObject();
