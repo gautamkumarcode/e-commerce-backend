@@ -47,6 +47,6 @@ const reviewSchema = new mongoose.Schema(
 )
 
 // Ensure one review per user per product
-reviewSchema.index({ user: 1, product: 1 }, { unique: true })
+// reviewSchema.index({ user: 1, product: 1 }, { unique: true })
 
 export default mongoose.model("Review", reviewSchema)

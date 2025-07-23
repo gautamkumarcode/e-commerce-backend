@@ -83,9 +83,9 @@ brandSchema.virtual("productCount", {
 });
 
 // Indexes for better performance
-brandSchema.index({ name: 1 });
-brandSchema.index({ slug: 1 });
-brandSchema.index({ isActive: 1, position: 1 });
+// brandSchema.index({ name: 1 });
+// brandSchema.index({ slug: 1 });
+// brandSchema.index({ isActive: 1, position: 1 });
 
 const Brand = mongoose.model("Brand", brandSchema);
 
