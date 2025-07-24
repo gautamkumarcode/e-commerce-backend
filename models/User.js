@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 
 const addressSchema = new mongoose.Schema(
 	{
+		area: { type: String },
+
 		street: { type: String },
 		city: { type: String },
 		state: { type: String },
@@ -14,8 +16,15 @@ const addressSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
 	{
-		name: {
+		firstname: {
 			type: String,
+			required: [true, "First name is required"],
+			trim: true,
+			maxlength: [50, "Name cannot exceed 50 characters"],
+		},
+		lastname: {
+			type: String,
+			required: [true, "Last name is required"],
 			trim: true,
 			maxlength: [50, "Name cannot exceed 50 characters"],
 		},
@@ -29,20 +38,7 @@ const userSchema = new mongoose.Schema(
 				"Please enter a valid email",
 			],
 		},
-		userName: {
-			type: String,
-			unique: true,
-			trim: true,
-			maxlength: [30, "Username cannot exceed 30 characters"],
-			lowercase: true,
-			match: [
-				/^[a-z0-9_]+$/,
-				"Username can only contain lowercase alphanumeric characters and underscores",
-			],
-			default: function () {
-				return "user" + Date.now();
-			},
-		},
+
 		password: {
 			type: String,
 			required: [true, "Password is required"],
@@ -62,8 +58,8 @@ const userSchema = new mongoose.Schema(
 			match: [/^\+?[\d\s-()]+$/, "Please enter a valid phone number"],
 		},
 		address: {
-			type: addressSchema,
-			default: {},
+			type: [addressSchema],
+			default: [],
 		},
 		isEmailVerified: {
 			type: Boolean,
@@ -82,6 +78,21 @@ const userSchema = new mongoose.Schema(
 		isVerified: {
 			type: Boolean,
 			default: false,
+		},
+		age: {
+			type: Number,
+			min: [0, "Age cannot be negative"],
+			max: [120, "Age cannot exceed 120"],
+		},
+		occupation: {
+			type: String,
+			required: [true, "Occupation is required"],
+			trim: true,
+			maxlength: [100, "Occupation cannot exceed 100 characters"],
+		},
+		gender: {
+			type: String,
+			enum: ["male", "female", "other"],
 		},
 	},
 	{

@@ -18,39 +18,44 @@ export const getBrandWithCategories = async (req, res, next) => {
 			});
 		}
 
-		const categories = await Product.aggregate([
-			{
-				$match: {
-					brand: new mongoose.Types.ObjectId(brand._id),
-					category: { $ne: null }, // only products with a category
+	const categories = await Product.aggregate([
+		{
+			$match: {
+				brand: new mongoose.Types.ObjectId(brandId),
+				category: { $ne: null },
+			},
+		},
+		{
+			$lookup: {
+				from: "categories",
+				localField: "category",
+				foreignField: "_id",
+				as: "category",
+			},
+		},
+		{ $unwind: "$category" },
+		{ $match: { "category.isActive": true } },
+		{
+			$group: {
+				_id: "$category._id",
+				name: { $first: "$category.name" },
+				slug: { $first: "$category.slug" },
+				image: { $first: "$category.image" },
+				description: { $first: "$category.description" },
+				products: {
+					$push: {
+						_id: "$_id",
+						name: "$name",
+						slug: "$slug",
+						price: "$price",
+						comparePrice: "$comparePrice",
+						images: "$images",
+					},
 				},
 			},
-			{
-				$group: {
-					_id: "$category",
-				},
-			},
-			{
-				$lookup: {
-					from: "categories",
-					localField: "_id",
-					foreignField: "_id",
-					as: "categoryDetails",
-				},
-			},
-			{ $unwind: "$categoryDetails" },
-			{ $match: { "categoryDetails.isActive": true } },
-			{ $sort: { "categoryDetails.position": 1 } },
-			{
-				$project: {
-					_id: "$categoryDetails._id",
-					name: "$categoryDetails.name",
-					slug: "$categoryDetails.slug",
-					image: "$categoryDetails.image",
-					description: "$categoryDetails.description",
-				},
-			},
-		]);
+		},
+		{ $sort: { position: 1 } }, // sort by category position if needed
+	]);
 
 		// 3. Return combined response
 		res.status(200).json({

@@ -4,7 +4,7 @@ import {
 	createCategory,
 	deleteCategory,
 	getCategories,
-	getCategory,
+	getCategoryById,
 	updateCategory,
 } from "../controller/category-controller.js";
 import { authorize, protect } from "../middleware/auth.js";
@@ -16,7 +16,7 @@ import {
 const router = express.Router();
 
 router.get("/", getCategories);
-router.get("/:id", getCategory);
+router.get("/:id", getCategoryById);
 router.post(
 	"/",
 	protect,

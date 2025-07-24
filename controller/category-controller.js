@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Category from "../models/Category.js";
+import Product from "../models/Product.js";
 
 // Helper function for error responses
 const errorResponse = (res, statusCode, message) => {
@@ -36,10 +37,19 @@ export const getCategories = async (req, res, next) => {
 				},
 			},
 		]);
+
+		//@create pagination logic
+		if (!categories || categories.length === 0) {
+			return errorResponse(res, 404, "No active categories found");
+		}
+		// Return the categories with subcategories
+
 		res.status(200).json({
 			success: true,
-			count: categories.length,
-			data: categories,
+			data: {
+				count: categories.length,
+				results: categories,
+			},
 		});
 	} catch (error) {
 		next(error);
@@ -47,14 +57,17 @@ export const getCategories = async (req, res, next) => {
 };
 
 // @desc    Get single category with populated parent and subcategories
-export const getCategory = async (req, res, next) => {
+export const getCategoryById = async (req, res, next) => {
 	try {
-		if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+		const categoryId = req.params.id;
+
+		if (!mongoose.Types.ObjectId.isValid(categoryId)) {
 			return errorResponse(res, 400, "Invalid category ID");
 		}
 
-		const category = await Category.aggregate([
-			{ $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+		// First, fetch the category along with subcategories and parent
+		const categoryResult = await Category.aggregate([
+			{ $match: { _id: new mongoose.Types.ObjectId(categoryId) } },
 			{
 				$lookup: {
 					from: "categories",
@@ -66,6 +79,7 @@ export const getCategory = async (req, res, next) => {
 						{ $sort: { position: 1, name: 1 } },
 						{
 							$project: {
+								_id: 1,
 								name: 1,
 								slug: 1,
 								description: 1,
@@ -90,16 +104,35 @@ export const getCategory = async (req, res, next) => {
 			{ $limit: 1 },
 		]);
 
-		if (!category || category.length === 0) {
+		if (!categoryResult || categoryResult.length === 0) {
 			return errorResponse(res, 404, "Category not found");
 		}
 
-		res.status(200).json({ success: true, data: category[0] });
+		const category = categoryResult[0];
+
+		// Collect category IDs (main + subcategories)
+		const categoryIds = [
+			category._id,
+			...(category.subcategories || []).map((sub) => sub._id),
+		];
+
+		// Fetch products belonging to this category or its subcategories
+		const products = await Product.find({
+			category: { $in: categoryIds },
+			isActive: true,
+		}).select("name slug price image description"); // Adjust fields as needed
+
+		res.status(200).json({
+			success: true,
+			results: {
+				...category,
+				products,
+			},
+		});
 	} catch (error) {
 		next(error);
 	}
 };
-
 // @desc    Create new category
 export const createCategory = async (req, res, next) => {
 	try {

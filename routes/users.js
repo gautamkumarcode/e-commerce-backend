@@ -1,6 +1,7 @@
 import express from "express"
-import User from "../models/User.js"
-import { protect, authorize } from "../middleware/auth.js"
+import { updateProfile } from "../controller/auth-controller.js";
+import { authorize, protect } from "../middleware/auth.js";
+import User from "../models/User.js";
 
 const router = express.Router()
 
@@ -53,35 +54,7 @@ router.get("/profile", protect, async (req, res, next) => {
 // @desc    Update user profile
 // @route   PUT /api/users/profile
 // @access  Private
-router.put("/profile", protect, async (req, res, next) => {
-  try {
-    const { name, email, phone, address } = req.body
-
-    const user = await User.findById(req.user.id)
-
-    if (user) {
-      user.name = name || user.name
-      user.email = email || user.email
-      user.phone = phone || user.phone
-      user.address = address || user.address
-
-      const updatedUser = await user.save()
-
-      res.status(200).json({
-        success: true,
-        message: "Profile updated successfully",
-        data: updatedUser,
-      })
-    } else {
-      res.status(404).json({
-        success: false,
-        message: "User not found",
-      })
-    }
-  } catch (error) {
-    next(error)
-  }
-})
+router.put("/profile/edit", protect, updateProfile);
 
 // @desc    Delete user
 // @route   DELETE /api/users/:id

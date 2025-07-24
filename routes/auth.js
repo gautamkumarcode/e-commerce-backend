@@ -1,6 +1,5 @@
 import express from "express";
 import {
-	completeRegistration,
 	forgotPassword,
 	getMe,
 	logout,
@@ -10,7 +9,6 @@ import {
 } from "../controller/auth-controller.js";
 import { protect } from "../middleware/auth.js";
 import {
-	completeRegistrationSchema,
 	sendOtpSchema,
 	validateRequest,
 	verifyOtpSchema,
@@ -27,12 +25,12 @@ router.post("/verify-otp", validateRequest(verifyOtpSchema), verifyOtpPhone);
 router.post("/resend-otp", validateRequest(sendOtpSchema), resendOtpToPhone);
 
 // @route   POST /api/auth/register-details
-router.post(
-	"/register-details",
-	validateRequest(completeRegistrationSchema),
-	protect,
-	completeRegistration
-);
+// router.post(
+// 	"/register-details",
+// 	validateRequest(completeRegistrationSchema),
+// 	protect,
+// 	completeRegistration
+// );
 
 
 // @route   POST /api/auth/login

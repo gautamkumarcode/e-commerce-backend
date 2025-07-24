@@ -203,8 +203,7 @@ export const verifyOtpPhone = async (req, res, next) => {
 		user.otpExpires = undefined;
 		user.isVerified = true;
 
-
-				await user.save({ validateBeforeSave: false });
+		await user.save({ validateBeforeSave: false });
 		const token = generateToken(user._id);
 
 		const userObj = user.toObject();
@@ -224,68 +223,67 @@ export const verifyOtpPhone = async (req, res, next) => {
 };
 
 // Optional: Cleanup stale cooldown entries
-setInterval(() => {
-	const now = Date.now();
-	for (const [phone, timestamp] of otpCooldownStore.entries()) {
-		if (now - timestamp > 5 * 60 * 1000) {
-			otpCooldownStore.delete(phone);
-		}
-	}
-}, 60 * 1000); // Run every 60 seconds
+// setInterval(() => {
+// 	const now = Date.now();
+// 	for (const [phone, timestamp] of otpCooldownStore.entries()) {
+// 		if (now - timestamp > 5 * 60 * 1000) {
+// 			otpCooldownStore.delete(phone);
+// 		}
+// 	}
+// }, 60 * 1000); // Run every 60 seconds
 
-export const completeRegistration = async (req, res, next) => {
-	try {
-		const {
-			name,
-			email,
-			password,
-			userName,
-			city,
-			state,
-			street,
-			zipCode,
-			country = "India",
-		} = req.body;
+// export const completeRegistration = async (req, res, next) => {
+// 	try {
+// 		const {
+// 			firstname,
+// 			lastname,
+// 			email,
+// 			userName,
+// 			gender,
+// 			age,
+// 			occupation,
 
-		const user = await User.findById(req.user.id); // use token from OTP verification
+// 		} = req.body;
 
-		if (!user) {
-			return res.status(404).json({
-				success: false,
-				message: "User not found",
-			});
-		}
+// 		const user = await User.findById(req.user.id); // use token from OTP verification
 
-		if (user.name && user.email) {
-			return res.status(400).json({
-				success: false,
-				message: "User is already registered",
-			});
-		}
+// 		if (!user) {
+// 			return res.status(404).json({
+// 				success: false,
+// 				message: "User not found",
+// 			});
+// 		}
 
-		user.name = name;
-		user.email = email;
-		user.password = password;
-		user.userName = userName;
-		user.address = {
-			street,
-			city,
-			state,
-			zipCode,
-			country,
-		};
+// 		if (user.name && user.email) {
+// 			return res.status(400).json({
+// 				success: false,
+// 				message: "User is already registered",
+// 			});
+// 		}
 
-		await user.save();
+// 		user.name = name;
+// 		user.email = email;
+// 		user.password = password;
+// 		user.userName = userName;
+// 		user.address = {
+// 			street,
+// 			city,
+// 			state,
+// 			zipCode,
+// 			country,
+// 		};
 
-		res.status(200).json({
-			success: true,
-			message: "Registration completed successfully",
-			user,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
+// 		await user.save();
+
+// 		res.status(200).json({
+// 			success: true,
+// 			message: "Registration completed successfully",
+// 			user,
+// 		});
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
 // export const login = async (req, res, next) => {
 // 	try {
@@ -395,10 +393,18 @@ export const resetPassword = async (req, res, next) => {
 	}
 };
 export const updateProfile = async (req, res, next) => {
+	const { firstname, lastname, email, gender, age, occupation } = req.body;
 	try {
+		if (!req.user) {
+			return res.status(401).json({
+				success: false,
+				message: "Unauthorized access",
+			});
+		}
+
 		const user = await User.findByIdAndUpdate(
 			req.user.id,
-			{ name: req.body.name, email: req.body.email },
+			{ email, firstname, lastname, gender, age, occupation },
 			{ new: true, runValidators: true }
 		);
 
